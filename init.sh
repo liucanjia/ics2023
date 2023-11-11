@@ -2,10 +2,10 @@
 
 # usage: addenv env_name path
 function addenv() {
-  sed -i -e "/^export $1=.*/d" ~/.bashrc
-  echo "export $1=`readlink -e $2`" >> ~/.bashrc
-  echo "By default this script will add environment variables into ~/.bashrc."
-  echo "After that, please run 'source ~/.bashrc' to let these variables take effect."
+  sed -i -e "/^export $1=.*/d" ~/.zshrc
+  echo "export $1=`readlink -e $2`" >> ~/.zshrc
+  echo "By default this script will add environment variables into ~/.zshrc."
+  echo "After that, please run 'source ~/.zshrc' to let these variables take effect."
   echo "If you use shell other than bash, please add these environment variables manually."
 }
 
@@ -18,11 +18,11 @@ function init() {
   fi
 
   while [ ! -d $3 ]; do
-    git clone -b $2 git@github.com:$1.git $3
+    git clone -b $2 https://github.com/$1.git $3
   done
   log="$1 `cd $3 && git log --oneline --no-abbrev-commit -n1`"$'\n'
-
-  if [ $4 == "true" ] ; then
+  
+  if [ $4=="true" ] ; then
     rm -rf $3/.git
     git add -A $3
     git commit -am "$1 $2 initialized"$'\n\n'"$log"
