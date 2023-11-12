@@ -55,6 +55,8 @@ static int cmd_q(char *args) {
 
 static int cmd_help(char *args);
 
+static int cmd_si(char *args);
+
 static struct {
   const char *name;
   const char *description;
@@ -65,6 +67,7 @@ static struct {
   { "q", "Exit NEMU", cmd_q },
 
   /* TODO: Add more commands */
+  {"si", "Execute next [N] instruction (after stopping)", cmd_si },
 
 };
 
@@ -89,6 +92,22 @@ static int cmd_help(char *args) {
       }
     }
     printf("Unknown command '%s'\n", arg);
+  }
+  return 0;
+}
+
+static int cmd_si(char *args) {
+  /* extract the first argument */
+  char *arg = strtok(NULL, " ");
+  int n = 0;
+  int argc = sscanf(arg, "%d", &n);
+
+
+  if (argc == 1 && (arg = strtok(NULL, " ")) == NULL) {
+    cpu_exec(n);
+  } else {
+    /* argument is illegal */
+    printf("(nemu) Usage: si [N]\n");
   }
   return 0;
 }
