@@ -100,15 +100,15 @@ static int cmd_si(char *args) {
   /* extract the first argument */
   char *arg = strtok(NULL, " ");
   int n = 0;
-  int argc = sscanf(arg, "%d", &n);
+  int argc = 0;
 
-
-  if (argc == 1 && (arg = strtok(NULL, " ")) == NULL) {
-    cpu_exec(n);
-  } else {
+  if (arg == NULL || (argc = sscanf(arg, "%d", &n)) != 1 || (arg = strtok(NULL, " ")) != NULL) {
     /* argument is illegal */
     printf("(nemu) Usage: si [N]\n");
+  } else {
+    cpu_exec(n);
   }
+
   return 0;
 }
 
