@@ -27,7 +27,7 @@ void isa_reg_display() {
   int NR_REG = ARRLEN(regs);
 
   for (int i = 0; i < NR_REG; i++) {
-    printf("%s: 0x%016lx\n", regs[i], cpu.gpr[i]);
+    printf("%3s: 0x%016lx\n", regs[i], cpu.gpr[i]);
   }
 }
 

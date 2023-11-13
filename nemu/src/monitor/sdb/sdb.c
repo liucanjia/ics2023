@@ -17,6 +17,7 @@
 #include <cpu/cpu.h>
 #include <readline/readline.h>
 #include <readline/history.h>
+#include "memory/vaddr.h"
 #include "sdb.h"
 
 static int is_batch_mode = false;
@@ -59,6 +60,10 @@ static int cmd_si(char *args);
 
 static int cmd_info(char *args);
 
+static int cmd_x(char *agrs);
+
+static bool switch_expr_to_addr(char *expr, word_t *addr);
+
 static struct {
   const char *name;
   const char *description;
@@ -70,8 +75,8 @@ static struct {
 
   /* TODO: Add more commands */
   {"si", "Execute next [N] instruction (after stopping)", cmd_si },
-  {"info", "Display information about registers or watchpoints", cmd_info}
-
+  {"info", "Display information about registers or watchpoints", cmd_info},
+  {"x", "Dispaly [N] bytes of memory, starting at address [EXPR]", cmd_x},
 };
 
 #define NR_CMD ARRLEN(cmd_table)
@@ -103,9 +108,8 @@ static int cmd_si(char *args) {
   /* extract the first argument */
   char *arg = strtok(NULL, " ");
   int n = 0;
-  int argc = 0;
 
-  if (arg == NULL || (argc = sscanf(arg, "%d", &n)) != 1 || (arg = strtok(NULL, " ")) != NULL) {
+  if (arg == NULL || sscanf(arg, "%d", &n) != 1 || (arg = strtok(NULL, " ")) != NULL) {
     /* argument is illegal */
     printf("(nemu) Usage: si [N]\n");
   } else {
@@ -119,11 +123,11 @@ static int cmd_info(char *args) {
   /* extract the first argument */
   char *arg = strtok(NULL, " ");
   char ch = 0;
-  int argc = 0;
 
   /* argument is illegal */
-  if (arg == NULL || (argc = sscanf(arg, "%c", &ch)) != 1 || (arg = strtok(NULL, " ")) != NULL) {
+  if (arg == NULL || sscanf(arg, "%c", &ch) != 1 || (arg = strtok(NULL, " ")) != NULL) {
     printf("(nemu) Usage: info [r or w]\n");
+    return 0;
   }
 
   switch (ch) {
@@ -140,6 +144,30 @@ static int cmd_info(char *args) {
       break;
   }
   return 0;
+}
+
+static int cmd_x(char *args) {
+  char *arg = strtok(NULL, " ");
+  int n = 0;
+  word_t addr = 0;
+
+  /* extract the first argument and calculate expression to find address */
+  if (arg == NULL || sscanf(arg, "%d", &n) != 1 || (arg = strtok(NULL, " ")) == NULL || switch_expr_to_addr(arg, &addr) == false) {
+    printf("(nemu) Usage: x [N] [EXPR]\n");
+    return 0;
+  } 
+
+  for (int i = 0; i < n; i++) {
+    printf("0x%08lx: 0x%08lx\n", addr, vaddr_read(addr, 4)); 
+    addr += 4;
+  }
+
+  return 0;
+}
+
+static bool switch_expr_to_addr(char *expr, word_t *addr) {
+  sscanf(expr, "0x%lx", addr);
+  return true;
 }
 
 void sdb_set_batch_mode() {
