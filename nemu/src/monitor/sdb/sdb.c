@@ -57,6 +57,8 @@ static int cmd_help(char *args);
 
 static int cmd_si(char *args);
 
+static int cmd_info(char *args);
+
 static struct {
   const char *name;
   const char *description;
@@ -68,6 +70,7 @@ static struct {
 
   /* TODO: Add more commands */
   {"si", "Execute next [N] instruction (after stopping)", cmd_si },
+  {"info", "Display information about registers or watchpoints", cmd_info}
 
 };
 
@@ -109,6 +112,33 @@ static int cmd_si(char *args) {
     cpu_exec(n);
   }
 
+  return 0;
+}
+
+static int cmd_info(char *args) {
+  /* extract the first argument */
+  char *arg = strtok(NULL, " ");
+  char ch = 0;
+  int argc = 0;
+
+  /* argument is illegal */
+  if (arg == NULL || (argc = sscanf(arg, "%c", &ch)) != 1 || (arg = strtok(NULL, " ")) != NULL) {
+    printf("(nemu) Usage: info [r or w]\n");
+  }
+
+  switch (ch) {
+    case 'r':
+      /* display information about registers */
+      isa_reg_display();
+      break;
+    case 'w':
+      /* display information about watchpoints */
+      break;
+    default:
+      /* argument is illegal */
+      printf("(nemu) Usage: info [r or w]\n");
+      break;
+  }
   return 0;
 }
 
