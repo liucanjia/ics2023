@@ -62,7 +62,7 @@ static int cmd_info(char *args);
 
 static int cmd_x(char *agrs);
 
-static bool switch_expr_to_addr(char *expr, word_t *addr);
+static int cmd_p(char *args);
 
 static struct {
   const char *name;
@@ -75,8 +75,9 @@ static struct {
 
   /* TODO: Add more commands */
   {"si", "Execute next [N] instruction (after stopping)", cmd_si },
-  {"info", "Display information about registers or watchpoints", cmd_info},
-  {"x", "Dispaly [N] bytes of memory, starting at address [EXPR]", cmd_x},
+  {"info", "Display information about registers or watchpoints", cmd_info },
+  {"x", "Dispaly [N] bytes of memory, starting at address [EXPR]", cmd_x },
+  {"p", "Calculate the value of [EXPR]", cmd_p },
 };
 
 #define NR_CMD ARRLEN(cmd_table)
@@ -150,12 +151,22 @@ static int cmd_x(char *args) {
   char *arg = strtok(NULL, " ");
   int n = 0;
   word_t addr = 0;
+  bool success = true;
 
-  /* extract the first argument and calculate expression to find address */
-  if (arg == NULL || sscanf(arg, "%d", &n) != 1 || (arg = strtok(NULL, " ")) == NULL || switch_expr_to_addr(arg, &addr) == false) {
+  /* extract the first argument */
+  if (arg == NULL || sscanf(arg, "%d", &n) != 1) {
     printf("(nemu) Usage: x [N] [EXPR]\n");
     return 0;
   } 
+
+  arg = arg + strlen(arg) + 1;
+  /* calculate expression to find address */
+  addr = expr(arg, &success);
+  if(success != true) {
+    printf("EXPR error!\n");
+    printf("(nemu) Usage: x [N] [EXPR]\n");
+    return 0;
+  }
 
   for (int i = 0; i < n; i++) {
     printf("0x%08lx: 0x%08lx\n", addr, vaddr_read(addr, 4)); 
@@ -165,9 +176,18 @@ static int cmd_x(char *args) {
   return 0;
 }
 
-static bool switch_expr_to_addr(char *expr, word_t *addr) {
-  sscanf(expr, "0x%lx", addr);
-  return true;
+static int cmd_p(char *args) {
+  bool success = true;
+
+  word_t  value = expr(args, &success);
+
+  if (success == true) {
+    printf("%lu\n", value);
+  } else {
+    printf("(nemu) Usage: p [EXPR]\n");
+  }
+
+  return 0;
 }
 
 void sdb_set_batch_mode() {
@@ -215,6 +235,9 @@ void sdb_mainloop() {
 void init_sdb() {
   /* Compile the regular expressions. */
   init_regex();
+
+  /* test math expression calcuation */
+  // test_expr();
 
   /* Initialize the watchpoint pool. */
   init_wp_pool();

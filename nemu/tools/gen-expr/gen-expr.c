@@ -26,13 +26,73 @@ static char code_buf[65536 + 128] = {}; // a little larger than `buf`
 static char *code_format =
 "#include <stdio.h>\n"
 "int main() { "
-"  unsigned result = %s; "
-"  printf(\"%%u\", result); "
+"  unsigned long result = %s; "
+"  printf(\"%%lu\", result); "
 "  return 0; "
 "}";
 
+static char *buf_statr = NULL;
+static char *buf_end = buf + (sizeof(buf)/sizeof(buf[0]));
+static char ops[] = {'+', '-', '*', '/'};
+
+static uint32_t choose(uint32_t n) {
+  return rand() % n;
+}
+
+static void gen(char ch) {
+  switch (ch) {
+    case ' ':
+      {
+        uint32_t size = choose(3);
+        if (buf_statr < buf_end) {
+          int n_writes = snprintf(buf_statr, buf_end - buf_statr, "%*s", size, "");
+          if(n_writes > 0) {
+          buf_statr += n_writes;
+          }
+        }
+      }
+    default:
+      if (buf_statr < buf_end) {
+        int n_writes = snprintf(buf_statr, buf_end - buf_statr, "%c", ch);
+        if(n_writes > 0) {
+          buf_statr += n_writes;
+        }
+      }
+      break;
+  }
+}
+
+static void gen_num() {
+  uint32_t num = choose(INT8_MAX);
+  if (buf_statr < buf_end) {
+    int n_writes = snprintf(buf_statr, buf_end - buf_statr, "%d", num);
+    if(n_writes > 0) {
+      buf_statr += n_writes;
+    }
+  }
+  gen(' ');
+}
+
+static void gen_rand_op() {
+  gen(ops[choose(sizeof(ops))]);
+}
+
 static void gen_rand_expr() {
-  buf[0] = '\0';
+  switch (choose(3)) {
+    case 0:
+      gen_num();
+      break;
+    case 1:
+      gen('(');
+      gen_rand_expr();
+      gen(')');
+      break;
+    default:
+      gen_rand_expr();
+      gen_rand_op();
+      gen_rand_expr();
+      break;
+  }
 }
 
 int main(int argc, char *argv[]) {
@@ -44,7 +104,13 @@ int main(int argc, char *argv[]) {
   }
   int i;
   for (i = 0; i < loop; i ++) {
+    buf_statr = buf;
     gen_rand_expr();
+
+    if (buf_statr >= buf_end) {
+      /* Ensure buf does not overflow */
+      continue;
+    }
 
     sprintf(code_buf, code_format, buf);
 
@@ -53,17 +119,17 @@ int main(int argc, char *argv[]) {
     fputs(code_buf, fp);
     fclose(fp);
 
-    int ret = system("gcc /tmp/.code.c -o /tmp/.expr");
+    int ret = system("gcc /tmp/.code.c -Wall -Werror -o /tmp/.expr");
     if (ret != 0) continue;
 
     fp = popen("/tmp/.expr", "r");
     assert(fp != NULL);
 
-    int result;
-    ret = fscanf(fp, "%d", &result);
+    unsigned long result;
+    ret = fscanf(fp, "%ld", &result);
     pclose(fp);
 
-    printf("%u %s\n", result, buf);
+    printf("%lu %s\n", result, buf);
   }
   return 0;
 }
