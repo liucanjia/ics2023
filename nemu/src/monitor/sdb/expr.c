@@ -19,9 +19,11 @@
  * Type 'man regex' for more information about POSIX regex functions.
  */
 #include <regex.h>
+#include "memory/vaddr.h"
+#include "memory/paddr.h"
 
 enum {
-  TK_NOTYPE = 256, TK_EQ, TK_INT, TK_ADDR, TK_REG, TK_VAR, TK_NEGATIVE
+  TK_NOTYPE = 256, TK_EQ, TK_NEQ, TK_AND, TK_OR, TK_GRE_EQ, TK_LESS_EQ, TK_INT, TK_REG, TK_VAR, TK_POSITIVE, TK_NEGATIVE, TK_DEREF
 
   /* TODO: Add more token types */
 
@@ -41,13 +43,52 @@ static struct rule {
   {"\\-", '-'},         // minus
   {"\\*", '*'},         // multiplication
   {"\\/", '/'},         // division
+  {"%%", '%'},          // mod
   {"\\(", '('},         // left parentheses
   {"\\)", ')'},         // right parentheses
   {"==", TK_EQ},        // equal
-  {"[0-9]+", TK_INT},   // integer
-  {"0x[0-9a-fA-F]+", TK_ADDR}, // address
+  {"!=", TK_NEQ},       // not equal
+  {"&&", TK_AND},       // and
+  {"\\|\\|", TK_OR},    // or
+  {"!", '!'},           // not
+  {">", '>'},           // greater 
+  {">=", TK_GRE_EQ},    // greater or equal to
+  {"<", '<'},           // less
+  {"<=", TK_LESS_EQ},   // less than or equal to
+  {"&", '&'},           // bitwise and
+  {"\\|", '|'},         // bitwise or
+  {"\\^", '^'},         // bitwise xor
+  {"~", '~'},           // bitwise inversion
+  {"(0x)?[0-9]+", TK_INT},   // decimal or hexadecimal number
   {"[\\$][a-z0-9]{1,3}", TK_REG}, // register
   {"[A-Za-z_]\\w*", TK_VAR} // variable
+};
+
+static struct op_rank {
+  int token_type;
+  int rank;
+} op_ranks[] = {
+  {TK_NEGATIVE, 2},
+  {TK_POSITIVE, 2},
+  {TK_DEREF, 2},
+  {'!', 2},
+  {'~', 2},
+  {'*', 3},
+  {'/', 3},
+  {'%', 3},
+  {'+', 4},
+  {'-', 4},
+  {'>', 6},
+  {TK_GRE_EQ, 6},
+  {'<', 6},
+  {TK_LESS_EQ, 6},
+  {TK_EQ, 7},
+  {TK_NEQ, 7},
+  {'&', 8},
+  {'^', 9},
+  {'|', 10},
+  {TK_AND, 11},
+  {TK_OR, 12},
 };
 
 #define NR_REGEX ARRLEN(rules)
@@ -83,6 +124,11 @@ static word_t eval(int start, int end, bool *success);
 static bool is_big_parentheses(int start, int end);
 static bool check_parentheses(int start, int end);
 static int find_primary_op(int start, int end);
+static bool switch_to_unary_operator();
+static word_t calc1(int op, word_t val2, bool *success);
+static word_t calc2(word_t val1, int op, word_t val2, bool *success);
+static int get_op_rank(int op);
+static bool is_unary_operator(int op);
 
 static bool make_token(char *e) {
   int position = 0;
@@ -113,7 +159,6 @@ static bool make_token(char *e) {
         tokens[nr_token].type = rules[i].token_type;
         switch (rules[i].token_type) {
           case TK_INT:
-          case TK_ADDR:
           case TK_REG:
           case TK_VAR:
             if (substr_len >= 32) {
@@ -124,13 +169,25 @@ static bool make_token(char *e) {
               tokens[nr_token].str[substr_len] = '\0';
             }
             break;
+          case '+':
+            if (switch_to_unary_operator() == true) {
+              /* positive number */
+              tokens[nr_token].type = TK_POSITIVE;
+            }
+            break;
           case '-':
-            if (nr_token == 0 || (tokens[nr_token-1].type != TK_INT && tokens[nr_token-1].type != TK_ADDR && tokens[nr_token-1].type != TK_REG && tokens[nr_token-1].type != TK_VAR && tokens[nr_token-1].type != ')')) {
+            if (switch_to_unary_operator() == true) {
               /* negative number */
               tokens[nr_token].type = TK_NEGATIVE;
             }
             break;
-          case '+': case '*': case '/': case '(': case ')':
+          case '*':
+            if (switch_to_unary_operator() == true) {
+              /* "*" mean dereference */
+              tokens[nr_token].type = TK_DEREF;
+            }
+            break;
+          case '/': case '%': case '(': case ')': case TK_EQ: case TK_NEQ: case TK_AND: case TK_OR: case '!': case '>': case TK_GRE_EQ: case '<': case TK_LESS_EQ: case '&': case '|': case '^': case '~':
             break;
           default:
             panic("token type %d is not implement\n", rules[i].token_type);
@@ -168,27 +225,27 @@ static word_t eval(int start, int end, bool *success) {
   if (start > end) {
     *success = false;
   } else if (start == end) {
-    /* <expr> ::= <number> */
     word_t val = 0;
     switch (tokens[start].type) {
       case TK_INT:
-        sscanf(tokens[start].str, "%ld", &val);
-        break;
-      case TK_ADDR:
+        /* <expr> ::= <decimal or hexadecimal number> */
+        if (strlen(tokens[start].str) > 2 && tokens[start].str[1] == 'x') {
+          sscanf(tokens[start].str, "%lx", &val);
+        } else {
+          sscanf(tokens[start].str, "%ld", &val);
+        }
         break;
       case TK_REG:
+        val = isa_reg_str2val(tokens[start].str, success);
         break;
       case TK_VAR:
+        TODO();
         break;
       default:
         *success = false;
     }
     return val;
-  } else if (tokens[start].type == TK_NEGATIVE) {
-    /* <expr> ::= - <number> */
-    return -eval(start + 1, end, success);
-  } 
-  else if (check_parentheses(start, end) == false)  {
+  } else if (check_parentheses(start, end) == false)  {
     /* parentheses is illegal */
     *success = false;
     return 0;
@@ -196,18 +253,41 @@ static word_t eval(int start, int end, bool *success) {
     /* <expr> ::= "(" <expr> ")" */
     return eval(start + 1, end - 1, success);
   } else {
-    /* <expr> ::= <expr> op <expr> */
+    /*  <expr> ::= <expr> "+" <expr>
+          | <expr> "-" <expr>
+          | <expr> "*" <expr>
+          | <expr> "/" <expr>
+          | <expr> "%" <expr>
+          | <expr> "==" <expr>
+          | <expr> "!=" <expr>
+          | <expr> "&&" <expr>
+          | <expr> "||" <expr>
+          | <expr> ">" <expr>
+          | <expr> ">=" <expr>
+          | <expr> "<" <expr>
+          | <expr> "<=" <expr>
+          | <expr> "&" <expr>
+          | <expr> "|" <expr>
+          | <expr> "^" <expr>
+          | "~" <expr>
+          | "+" <expr>
+          | "-" <expr>
+          | "*" <expr>              # dereference pointer
+    */
     int op = find_primary_op(start, end);
 
-    word_t val1 = eval(start, op - 1, success);
-    word_t val2 = eval(op + 1, end, success);
-    switch (tokens[op].type) {
-      case '+': return val1 + val2;
-      case '-': return val1 - val2;       
-      case '*': return val1 * val2;
-      case '/': return (sword_t)val1 / (sword_t)val2; // 生成用例为有符号除法, 面向用例修改
-      default:
-        *success = false;
+    bool ok1 = true, ok2 = true;
+    word_t val1 = eval(start, op - 1, &ok1);
+    word_t val2 = eval(op + 1, end, &ok2);
+
+    if (ok2 == false) {
+      *success = false;
+    }
+
+    if (ok1 == true) {
+      return calc2(val1, tokens[op].type, val2, success);
+    } else {
+      return calc1(tokens[op].type, val2, success);
     }
   }
 
@@ -242,7 +322,7 @@ static bool check_parentheses(int start, int end) {
 
 static int find_primary_op(int start, int end) {
   int left_parentheses = 0;
-  int op = -1;
+  int op_pos = -1, op_rank = 0;
 
   for (int i = start; i <= end; i++) {
     if (left_parentheses > 0) {
@@ -254,24 +334,110 @@ static int find_primary_op(int start, int end) {
       continue;
     }
 
-    switch (tokens[i].type) {
-      case '(':
-        left_parentheses++;
-        break;
-      case ')':
-        left_parentheses--;
-        break;
-      case '+':
-      case '-':
-        op = i;
-      case '*':
-      case '/':
-        if (op == -1 || tokens[op].type == '*' || tokens[op].type == '/') 
-          op = i;
+    if (tokens[i].type == '(') {
+      left_parentheses++;
+      continue;
+    }
+
+    int cur_op_rank = get_op_rank(tokens[i].type);
+    if (cur_op_rank > op_rank || (cur_op_rank == op_rank && is_unary_operator(tokens[i].type) == false)) {
+      op_pos = i;
+      op_rank = cur_op_rank;
+    }
+
+  }
+  return op_pos;
+}
+
+static bool switch_to_unary_operator() {
+  if (nr_token == 0) {
+    return true;
+  }
+
+  switch (tokens[nr_token-1].type) {
+    case ')':
+    case TK_INT:
+    case TK_REG:
+    case TK_VAR:
+      return false;
+    default:
+      return true;
+  }
+  return false;
+}
+
+static word_t calc1(int op, word_t val2, bool *success) {
+  switch (op) {
+    case '!':
+      /* <expr> ::= "!" <expr> */
+      return !val2;
+    case '~':
+      /* <expr> ::= "~" <expr> */
+      return ~val2;
+    case TK_POSITIVE:
+      /* <expr> ::= + <number> */
+      return val2;
+    case TK_NEGATIVE:
+      /* <expr> ::= - <number> */
+      return -val2;
+    case TK_DEREF:
+      /* <expr> ::= "*" <expr> */
+      if (likely(in_pmem(val2))) {
+        return vaddr_read(val2, 8);
+      } else {
+        *success = false;
         break;
       }
+    default:
+      *success = false;
+  }
+  return 0;
+}
+
+static word_t calc2(word_t val1, int op, word_t val2, bool *success) {
+  switch (op) {
+    case '+': return val1 + val2;
+    case '-': return val1 - val2;
+    case '*': return val1 * val2;
+    case '/': return (sword_t)val1 / (sword_t)val2;
+    case '%': return val1 % val2;
+    case TK_EQ: return val1 == val2;
+    case TK_NEQ: return val1 != val2;
+    case TK_AND: return val1 && val2;
+    case TK_OR: return val1 || val2;
+    case '>': return val1 > val2;
+    case TK_GRE_EQ: return val1 >= val2;
+    case '<': return val1 < val2;
+    case TK_LESS_EQ: return val1 <= val2;
+    case '&': return val1 & val2;
+    case '|': return val1 | val2;
+    case '^': return val1 ^ val2;
+    default:
+      *success = false;
+  }
+
+  return 0;
+}
+
+static int get_op_rank(int op) {
+  for (int i = 0; i < sizeof(op_ranks)/sizeof(op_ranks[0]); i++) {
+    if (op == op_ranks[i].token_type) {
+      return op_ranks[i].rank;
     }
-    return op;
+  }
+  return 0;
+}
+
+static bool is_unary_operator(int op) {
+  switch (op) {
+    case TK_POSITIVE:
+    case TK_NEGATIVE:
+    case TK_DEREF:
+    case '!':
+    case '~':
+      return true;
+  }
+  return false;
 }
 
 void test_expr() {

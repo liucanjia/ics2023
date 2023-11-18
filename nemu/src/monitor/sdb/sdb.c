@@ -64,6 +64,10 @@ static int cmd_x(char *agrs);
 
 static int cmd_p(char *args);
 
+static int cmd_w(char *args);
+
+static int cmd_d(char *args);
+
 static struct {
   const char *name;
   const char *description;
@@ -78,6 +82,8 @@ static struct {
   {"info", "Display information about registers or watchpoints", cmd_info },
   {"x", "Dispaly [N] bytes of memory, starting at address [EXPR]", cmd_x },
   {"p", "Calculate the value of [EXPR]", cmd_p },
+  {"w", "Set watchpoint at the memory address of [EXPR]", cmd_w},
+  {"d", "Delete [No] watchpoint in the memory", cmd_d}
 };
 
 #define NR_CMD ARRLEN(cmd_table)
@@ -138,6 +144,7 @@ static int cmd_info(char *args) {
       break;
     case 'w':
       /* display information about watchpoints */
+      wp_display();
       break;
     default:
       /* argument is illegal */
@@ -184,7 +191,49 @@ static int cmd_p(char *args) {
   if (success == true) {
     printf("%lu\n", value);
   } else {
+    printf("EXPR error!\n");
     printf("(nemu) Usage: p [EXPR]\n");
+  }
+
+  return 0;
+}
+
+static int cmd_w(char *args) {
+  /* extract the first argument */
+  char *arg = strtok(NULL, " ");
+  bool success = true;
+
+  if (arg == NULL) {
+    printf("(nemu) Usage: w [EXPR]\n");
+  }
+
+  word_t old = expr(args, &success);
+  if (success != true) {
+    printf("EXPR error!\n");
+    printf("(nemu) Usage: p [EXPR]\n");
+  } else {
+    WP *p = new_wp();
+    strncpy(p->buf, args, sizeof(p->buf));
+    p->old = old;
+    printf("Watchpoint %d: %s\n", p->NO, args);
+  }
+  return 0;
+}
+
+static int cmd_d(char *args) {
+  /* extract the first argument */
+  char *arg = strtok(NULL, " ");
+  int no = 0;
+
+  if (arg == NULL || sscanf(arg, "%d", &no) != 1 || (arg = strtok(NULL, " ")) != NULL) {
+    /* argument is illegal */
+    printf("(nemu) Usage: d [No]\n");
+  } else {
+    WP *p = find_wp(no);
+    if (p != NULL) {
+      free_wp(p);
+      printf("Delete watchpoint %d: %s\n", p->NO, p->buf);
+    }
   }
 
   return 0;
