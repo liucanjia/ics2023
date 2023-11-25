@@ -189,7 +189,7 @@ static int cmd_p(char *args) {
   word_t  value = expr(args, &success);
 
   if (success == true) {
-    printf("%lu\n", value);
+    printf("0x%016lx\n", value);
   } else {
     printf("EXPR error!\n");
     printf("(nemu) Usage: p [EXPR]\n");

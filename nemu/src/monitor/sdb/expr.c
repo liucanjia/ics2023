@@ -59,7 +59,7 @@ static struct rule {
   {"\\|", '|'},         // bitwise or
   {"\\^", '^'},         // bitwise xor
   {"~", '~'},           // bitwise inversion
-  {"(0x)?[0-9]+", TK_INT},   // decimal or hexadecimal number
+  {"(0x)?[0-9a-f]+", TK_INT},   // decimal or hexadecimal number
   {"[\\$][a-z0-9]{1,3}", TK_REG}, // register
   {"[A-Za-z_]\\w*", TK_VAR} // variable
 };
