@@ -26,4 +26,25 @@ void invalid_inst(vaddr_t thispc);
 #define NEMUTRAP(thispc, code) set_nemu_state(NEMU_END, thispc, code)
 #define INV(thispc) invalid_inst(thispc)
 
+// ftrace
+struct func_info {
+    char func_name[128];
+    word_t func_start;
+    word_t func_end;
+};
+
+struct ret_info {
+    uint64_t depth;
+    vaddr_t addr;
+    struct ret_info *next;
+};
+void ret_list_init();
+void ret_list_inster(vaddr_t addr);
+void ret_list_remove();
+
+int find_func_name(vaddr_t addr);
+
+void func_trace_call(vaddr_t pc, vaddr_t target, bool tail_call);
+void func_trace_ret(vaddr_t pc);
+
 #endif

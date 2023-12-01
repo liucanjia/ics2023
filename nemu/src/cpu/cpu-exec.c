@@ -27,11 +27,15 @@
 #define MAX_IRINGBUF_SIZE 32
 
 extern void wp_difftest();
+extern struct func_info *func_table;
+extern size_t func_table_size;
 
 CPU_state cpu = {};
 uint64_t g_nr_guest_inst = 0;
 static uint64_t g_timer = 0; // unit: us
 static bool g_print_step = false;
+static struct ret_info *ret_list = NULL;
+static int func_call_depth = 0;
 
 struct ibuf {
   char logbuf[128];
@@ -112,6 +116,19 @@ void assert_fail_msg() {
   statistic();
 }
 
+static void display_iringbuf() {
+  if (nemu_state.state == NEMU_ABORT || (nemu_state.state == NEMU_END && nemu_state.halt_ret != 0)) {
+    for (size_t i = 0; i < MAX_IRINGBUF_SIZE; i++) {
+      if (i == g_iringbuf_idx) {
+        printf("--> ");
+      } else {
+        printf("    ");
+      }
+      printf("%s\n", iringbuf[i].logbuf);
+    }
+  }
+}
+
 /* Simulate how the CPU works. */
 void cpu_exec(uint64_t n) {
   g_print_step = (n < MAX_INST_TO_PRINT);
@@ -133,22 +150,95 @@ void cpu_exec(uint64_t n) {
     case NEMU_RUNNING: nemu_state.state = NEMU_STOP; break;
 
     case NEMU_END: case NEMU_ABORT:
-      if (nemu_state.state == NEMU_ABORT || (nemu_state.state == NEMU_END && nemu_state.halt_ret != 0)) {
-        for (size_t i = 0; i < MAX_IRINGBUF_SIZE; i++) {
-          if (i == g_iringbuf_idx) {
-            printf("--> ");
-          } else {
-            printf("    ");
-          }
-          printf("%s\n", iringbuf[i].logbuf);
-        }
-      }
+      display_iringbuf();
+
       Log("nemu: %s at pc = " FMT_WORD,
           (nemu_state.state == NEMU_ABORT ? ANSI_FMT("ABORT", ANSI_FG_RED) :
            (nemu_state.halt_ret == 0 ? ANSI_FMT("HIT GOOD TRAP", ANSI_FG_GREEN) :
             ANSI_FMT("HIT BAD TRAP", ANSI_FG_RED))),
           nemu_state.halt_pc);
       // fall through
-    case NEMU_QUIT: statistic();
+    case NEMU_QUIT:
+      if (func_table != NULL) {
+        free(func_table);
+      }
+      statistic();
   }
+}
+
+/* trace the func call and ret */
+void func_trace_call(vaddr_t pc, vaddr_t target, bool tail_call) {
+  if (func_table == NULL) {
+    return ;
+  }
+
+  int idx = find_func_name(target);
+  _Log("0x%08lx:%*s call [%s@0x%08lx]\n", pc, func_call_depth, "", func_table[idx].func_name, target);
+
+  if (tail_call == true) {
+    ret_list_inster(pc);
+  }
+
+  func_call_depth++;
+}
+
+void func_trace_ret(vaddr_t pc) {
+  if (func_table == NULL) {
+    return ;
+  }
+
+  func_call_depth--;
+
+  int idx = find_func_name(pc);
+  _Log("0x%08lx:%*s ret  [%s]\n", pc, func_call_depth, "", func_table[idx].func_name);
+  
+  struct ret_info *node = ret_list->next;
+  if (node != NULL && node->depth == func_call_depth) {
+    vaddr_t tmp_addr = node->addr;
+    ret_list_remove();
+    func_trace_ret(tmp_addr);
+  }
+}
+
+void ret_list_init() {
+  ret_list = (struct ret_info*)malloc(sizeof(struct ret_info));
+  ret_list->depth = 0;
+  ret_list->addr = 0;
+  ret_list->next = NULL;
+}
+
+void ret_list_inster(vaddr_t addr) {
+  if (ret_list == NULL) {
+    ret_list_init();
+  }
+
+  struct ret_info *tmp = (struct ret_info*)malloc(sizeof(struct ret_info));
+  tmp->addr = addr;
+  tmp->depth = func_call_depth;
+  tmp->next = ret_list->next;
+  ret_list->next = tmp;
+}
+
+void ret_list_remove() {
+  struct ret_info *tmp = ret_list->next;
+
+  if (tmp != NULL) {
+    ret_list->next = tmp->next;
+    free(tmp);
+  } else {
+    // only head node
+    free(ret_list);
+  }
+}
+
+int find_func_name(vaddr_t addr) {
+  size_t idx = 0;
+
+  for(; idx < func_table_size - 1; idx++) {
+    if (addr >= func_table[idx].func_start && addr < func_table[idx].func_end) {
+      return idx;
+    }
+  }
+
+  return idx;
 }

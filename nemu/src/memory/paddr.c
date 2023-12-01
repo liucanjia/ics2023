@@ -41,6 +41,7 @@ static void out_of_bound(paddr_t addr) {
       addr, PMEM_LEFT, PMEM_RIGHT, cpu.pc);
 }
 
+#ifdef CONFIG_MTRACE
 static void display_pread(paddr_t addr, int len) {
   printf("At pc = " FMT_WORD "\tpread  at " FMT_PADDR "\tlen=%d\n", cpu.pc, addr, len);
 }
@@ -48,6 +49,7 @@ static void display_pread(paddr_t addr, int len) {
 static void display_pwrite(paddr_t addr, int len, word_t data) {
   printf("At pc = " FMT_WORD "\tpwrite at " FMT_PADDR "\tlen=%d,\tdata=" FMT_WORD "\n", cpu.pc, addr, len, data);
 }
+#endif
 
 void init_mem() {
 #if   defined(CONFIG_PMEM_MALLOC)
