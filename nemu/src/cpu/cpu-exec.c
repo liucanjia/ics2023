@@ -24,7 +24,9 @@
  * You can modify this value as you want.
  */
 #define MAX_INST_TO_PRINT 10
+#ifdef CONFIG_ITRACE
 #define MAX_IRINGBUF_SIZE 32
+#endif
 
 extern void wp_difftest();
 extern struct func_info *func_table;
@@ -37,17 +39,21 @@ static bool g_print_step = false;
 static struct ret_info *ret_list = NULL;
 static int func_call_depth = 0;
 
+#ifdef CONFIG_ITRACE
 struct ibuf {
   char logbuf[128];
 } iringbuf[MAX_IRINGBUF_SIZE];
 size_t g_iringbuf_idx = -1;
+#endif
 
 void device_update();
 
+#ifdef CONFIG_ITRACE
 static void trace_iringbuf(Decode *_this) {
   g_iringbuf_idx = (g_iringbuf_idx + 1) % MAX_IRINGBUF_SIZE;
   strcpy(iringbuf[g_iringbuf_idx].logbuf, _this->logbuf);
 }
+#endif
 
 static void trace_and_difftest(Decode *_this, vaddr_t dnpc) {
 #ifdef CONFIG_ITRACE_COND
@@ -95,7 +101,7 @@ static void execute(uint64_t n) {
   for (;n > 0; n --) {
     exec_once(&s, cpu.pc);
     g_nr_guest_inst ++;
-    trace_iringbuf(&s);
+    IFDEF(CONFIG_ITRACE, trace_iringbuf(&s));
     trace_and_difftest(&s, cpu.pc);
     if (nemu_state.state != NEMU_RUNNING) break;
     IFDEF(CONFIG_DEVICE, device_update());
@@ -116,6 +122,7 @@ void assert_fail_msg() {
   statistic();
 }
 
+#ifdef CONFIG_ITRACE
 static void display_iringbuf() {
   if (nemu_state.state == NEMU_ABORT || (nemu_state.state == NEMU_END && nemu_state.halt_ret != 0)) {
     for (size_t i = 0; i < MAX_IRINGBUF_SIZE; i++) {
@@ -128,6 +135,7 @@ static void display_iringbuf() {
     }
   }
 }
+#endif
 
 /* Simulate how the CPU works. */
 void cpu_exec(uint64_t n) {
@@ -150,7 +158,7 @@ void cpu_exec(uint64_t n) {
     case NEMU_RUNNING: nemu_state.state = NEMU_STOP; break;
 
     case NEMU_END: case NEMU_ABORT:
-      display_iringbuf();
+      IFDEF(CONFIG_ITRACE, display_iringbuf());
 
       Log("nemu: %s at pc = " FMT_WORD,
           (nemu_state.state == NEMU_ABORT ? ANSI_FMT("ABORT", ANSI_FG_RED) :

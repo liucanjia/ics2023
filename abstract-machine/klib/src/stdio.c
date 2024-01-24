@@ -2,18 +2,16 @@
 #include <klib.h>
 #include <klib-macros.h>
 #include <stdarg.h>
-#include <stdbool.h>
 
 #if !defined(__ISA_NATIVE__) || defined(__NATIVE_USE_KLIB__)
 
-static void reverse(char *str, int len) {
-  char *end = str + len - 1;
+static void reverse(char *begin, char *end) {
 
   char tmp;
-  while (str++ < end--) {
-    tmp = *str;
-    *str = *end;
-    *end = tmp;
+  while (begin < end) {
+    tmp = *begin;
+    *begin++ = *end;
+    *end-- = tmp;
   }
 }
 
@@ -41,7 +39,7 @@ static int itoa(int val, char *str) {
     str[len++] = '-';
   }
 
-  reverse(str, len);
+  reverse(str, str + len - 1);
   return len;
 }
 
@@ -61,15 +59,38 @@ int printf(const char *fmt, ...) {
 int vsprintf(char *out, const char *fmt, va_list ap) {
   int val;
   char *s, *ptr = out;
+  int zero_flag = 0;
 
   for (; *fmt != '\0'; fmt++) {
     if (*fmt == '%'){
+      int val_width = 0;
+
       fmt++;
+      // %0md
+      if (*fmt == '0') {
+        zero_flag = 1;
+        fmt++;
+      }
+      while(*fmt >= '0' && *fmt <= '9') {
+        val_width = val_width * 10 + (*fmt - '0');
+        fmt++;
+      }
+
       switch (*fmt) {
-        case 'd':
+        case 'd': {
+          int val_len = 0;
           val = va_arg(ap, int);
-          out += itoa(val, out);
+          val_len = itoa(val, out);
+          if (val_len < val_width) {
+            for (int i = 0; i < val_width - val_len; i++) {
+              *(out + val_len + i) = zero_flag ? '0': ' ';
+            }
+            reverse(out, out + val_len - 1);
+            reverse(out, out + val_width - 1);
+          }
+          out += val_width > val_len ? val_width: val_len;
           break;
+        }
         case 's':
           s = va_arg(ap, char*);
           while (*s != '\0') {
