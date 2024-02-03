@@ -213,7 +213,7 @@ static int cmd_w(char *args) {
     printf("(nemu) Usage: p [EXPR]\n");
   } else {
     WP *p = new_wp();
-    strncpy(p->buf, args, sizeof(p->buf));
+    strncpy(p->buf, args, sizeof(p->buf) - 1);
     p->old = old;
     printf("Watchpoint %d: %s\n", p->NO, args);
   }

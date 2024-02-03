@@ -17,17 +17,21 @@
 #include <cpu/difftest.h>
 #include "../local-include/reg.h"
 
-bool isa_difftest_checkregs(CPU_state *ref_r, vaddr_t pc) {
-  if (pc != ref_r->pc) {
-    return false;
-  }
+#define CHECKREG(reg) if (ref_r->reg != cpu.reg) { return false; }
 
+bool isa_difftest_checkregs(CPU_state *ref_r, vaddr_t pc) {
   int nr_gpr = MUXDEF(CONFIG_RVE, 16, 32);
   for (int i = 0; i < nr_gpr; i++) {
     if (ref_r->gpr[i] != gpr(i)) {
       return false;
     }
   }
+
+  CHECKREG(pc);
+  CHECKREG(mcause);
+  CHECKREG(mstatus);
+  CHECKREG(mepc);
+  CHECKREG(mtvec);
 
   return true;
 }

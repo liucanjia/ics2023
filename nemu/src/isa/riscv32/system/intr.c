@@ -20,6 +20,18 @@ word_t isa_raise_intr(word_t NO, vaddr_t epc) {
    * Then return the address of the interrupt/exception vector.
    */
 
+#ifdef CONFIG_ETRACE
+  _Log("\nTrigger an interrupt/exception with NO.%d. PC is 0x%lx\n", (int32_t)NO, epc);
+#endif
+
+  cpu.mcause = 0xb; //environment call from M-mode
+  
+  
+  if (NO == -1) {   // yield
+    cpu.mepc = epc;
+    return cpu.mtvec;
+  }
+
   return 0;
 }
 
