@@ -45,7 +45,7 @@ static int itoa(int val, char *str) {
 
 int printf(const char *fmt, ...) {
   int val = 0;
-  char buf[256];
+  char buf[2048];
 
   va_list ap;
   va_start(ap, fmt);
