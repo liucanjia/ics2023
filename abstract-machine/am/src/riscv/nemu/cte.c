@@ -2,6 +2,8 @@
 #include <riscv/riscv.h>
 #include <klib.h>
 
+#define SYS_yield 1
+
 static Context* (*user_handler)(Event, Context*) = NULL;
 
 Context* __am_irq_handle(Context *c) {
@@ -9,7 +11,7 @@ Context* __am_irq_handle(Context *c) {
     Event ev = {0};
     switch (c->mcause) {
       case 0xb: 
-        if (c->GPR1 == -1) {  // yield
+        if (c->GPR1 == SYS_yield) {  // yield
           c->mepc += 4;
           ev.event = EVENT_YIELD; 
           break;
@@ -42,9 +44,9 @@ Context *kcontext(Area kstack, void (*entry)(void *), void *arg) {
 
 void yield() {
 #ifdef __riscv_e
-  asm volatile("li a5, -1; ecall");
+  asm volatile("li a5, 1; ecall");
 #else
-  asm volatile("li a7, -1; ecall");
+  asm volatile("li a7, 1; ecall");
 #endif
 }
 

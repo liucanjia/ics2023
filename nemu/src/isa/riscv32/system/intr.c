@@ -15,6 +15,8 @@
 
 #include <isa.h>
 
+#define SYS_yield 1
+
 word_t isa_raise_intr(word_t NO, vaddr_t epc) {
   /* TODO: Trigger an interrupt/exception with ``NO''.
    * Then return the address of the interrupt/exception vector.
@@ -27,7 +29,7 @@ word_t isa_raise_intr(word_t NO, vaddr_t epc) {
   cpu.mcause = 0xb; //environment call from M-mode
   
   
-  if (NO == -1) {   // yield
+  if (NO == SYS_yield) {   // yield
     cpu.mepc = epc;
     return cpu.mtvec;
   }

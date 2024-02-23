@@ -6,7 +6,6 @@
 #if !defined(__ISA_NATIVE__) || defined(__NATIVE_USE_KLIB__)
 
 static void reverse(char *begin, char *end) {
-
   char tmp;
   while (begin < end) {
     tmp = *begin;
@@ -58,6 +57,8 @@ int printf(const char *fmt, ...) {
 
 int vsprintf(char *out, const char *fmt, va_list ap) {
   int val;
+  unsigned int xval;
+  unsigned long addr;
   char *s, *ptr = out;
   int zero_flag = 0;
 
@@ -89,6 +90,55 @@ int vsprintf(char *out, const char *fmt, va_list ap) {
             reverse(out, out + val_width - 1);
           }
           out += val_width > val_len ? val_width: val_len;
+          break;
+        }
+        case 'p': {
+            int addr_len = 0;
+            addr = va_arg(ap, unsigned long);
+            while (addr) {
+              out[addr_len] = addr % 16;
+              if (out[addr_len] < 10) {
+                out[addr_len] += '0';
+              } else {
+                out[addr_len] += 'a' - 10;
+              }
+              addr /= 16;
+              addr_len++;
+            }
+#ifdef __LP64__
+            int addr_width = 16;
+#else
+            int addr_width = 8;
+#endif
+            while (addr_len < addr_width) {
+              out[addr_len++] = '0';
+            }
+            reverse(out, out + addr_len - 1);
+            out += addr_len;
+          break;
+        }
+        case 'x': {
+          int xval_len = 0;
+          xval = va_arg(ap, unsigned int);
+          while (xval) {
+            out[xval_len] = xval % 16;
+            if (out[xval_len] < 10) {
+              out[xval_len] += '0';
+            } else {
+              out[xval_len] += 'a' - 10;
+            }
+            xval /= 16;
+            xval_len++;
+          }
+          if (xval_len < val_width) {
+            for (int i = 0; i < val_width - xval_len; i++) {
+              *(out + xval_len + i) = zero_flag ? '0': ' ';
+            }
+            reverse(out, out + val_width - 1);
+          } else {
+            reverse(out, out + xval_len - 1);
+          }
+          out += val_width > xval_len ? val_width: xval_len;
           break;
         }
         case 's':
