@@ -2,7 +2,7 @@
 #include <riscv/riscv.h>
 #include <klib.h>
 
-#define SYS_yield 1
+extern void do_syscall(Context *c);
 
 static Context* (*user_handler)(Event, Context*) = NULL;
 
@@ -11,15 +11,17 @@ Context* __am_irq_handle(Context *c) {
     Event ev = {0};
     switch (c->mcause) {
       case 0xb: 
-        if (c->GPR1 == SYS_yield) {  // yield
-          c->mepc += 4;
+        if (c->GPR1 == -1) {  // event_yield
           ev.event = EVENT_YIELD; 
-          break;
+          c = user_handler(ev, c);
+        } else if (c->GPR1 >= 0) {  // event_syscall
+          ev.event = EVENT_SYSCALL;
+          do_syscall(c);
         }
+        c->mepc += 4;
+        break;
       default: ev.event = EVENT_ERROR; break;
     }
-
-    c = user_handler(ev, c);
     assert(c != NULL);
   }
 
@@ -44,9 +46,9 @@ Context *kcontext(Area kstack, void (*entry)(void *), void *arg) {
 
 void yield() {
 #ifdef __riscv_e
-  asm volatile("li a5, 1; ecall");
+  asm volatile("li a5, -1; ecall");
 #else
-  asm volatile("li a7, 1; ecall");
+  asm volatile("li a7, -1; ecall");
 #endif
 }
 
