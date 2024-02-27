@@ -1,5 +1,6 @@
 #include <proc.h>
 #include <elf.h>
+#include <fs.h>
 
 #ifdef __LP64__
 # define Elf_Ehdr Elf64_Ehdr
@@ -14,9 +15,11 @@ extern uint8_t ramdisk_end;
 extern size_t ramdisk_read(void *buf, size_t offset, size_t len);
 
 static uintptr_t loader(PCB *pcb, const char *filename) {
+  int fd = fs_open(filename, 0, 0);
+
   Elf_Ehdr  ehdr;
   /* read the elf head */
-  int ret = ramdisk_read(&ehdr, 0, sizeof(Elf_Ehdr));
+  int ret = fs_read(fd, &ehdr, sizeof(Elf_Ehdr));
   assert(ret == sizeof(Elf_Ehdr));
 
   /* check if the file is an ELF image */
@@ -44,7 +47,8 @@ static uintptr_t loader(PCB *pcb, const char *filename) {
   /* read the program header table */
   Elf_Phdr phdr[ehdr.e_phnum];
 
-  ret = ramdisk_read(phdr, ehdr.e_phoff, sizeof(Elf_Phdr) * ehdr.e_phnum);
+  fs_lseek(fd, ehdr.e_phoff, SEEK_SET);
+  ret = fs_read(fd, phdr, sizeof(Elf_Phdr) * ehdr.e_phnum);
   assert(ret == sizeof(Elf_Phdr) * ehdr.e_phnum);
 
   /* load the segments to memory */
@@ -52,7 +56,8 @@ static uintptr_t loader(PCB *pcb, const char *filename) {
     if (phdr[i].p_type == PT_LOAD) {
       // set .bbs with zero
       memset((void*)phdr[i].p_vaddr, 0, phdr[i].p_memsz);
-      ramdisk_read((void*)phdr[i].p_vaddr, phdr[i].p_offset, phdr[i].p_filesz);
+      fs_lseek(fd, phdr[i].p_offset, SEEK_SET);
+      fs_read(fd, (void*)phdr[i].p_vaddr, phdr[i].p_filesz);
     }
   }
 
