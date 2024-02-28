@@ -2,6 +2,7 @@
 #include "syscall.h"
 #include "am.h"
 #include <fs.h>
+#include <sys/time.h>
 
 void do_syscall(Context *c) {
   uintptr_t a[4];
@@ -39,14 +40,7 @@ void do_syscall(Context *c) {
 #endif
       break;
     case SYS_write:
-      if (a[1] == FD_STDOUT || a[1] == FD_STDERR) {
-        for (uintptr_t i = 0; i < a[3]; i++) {
-          putch(*(char*)(a[2] + i));
-        }
-        return_val = a[3];
-      } else {
         return_val = fs_write(a[1], (const void *)a[2], a[3]);
-      } 
 #ifdef CONFIG_STRACE
       switch (a[1]) {
         case FD_STDIN:
@@ -81,6 +75,15 @@ void do_syscall(Context *c) {
 #ifdef CONFIG_STRACE
       printf("Syscall brk, program break: %p, return_val: %d.\n", a[1], return_val);
 #endif
+      break;
+    case SYS_gettimeofday:
+      struct timeval* tv = (struct timeval*)a[1];
+      uint64_t us = io_read(AM_TIMER_UPTIME).us;
+      if (tv != NULL) {
+        tv->tv_sec = us / 1000000;
+        tv->tv_usec = us % 1000000;
+      }
+      return_val = 0;
       break;
     default: panic("Unhandled syscall ID = %d", a[0]);
   }
