@@ -1,5 +1,5 @@
 #include <NDL.h>
-#include <sdl-video.h>
+#include <SDL.h>
 #include <assert.h>
 #include <string.h>
 #include <stdlib.h>
@@ -13,6 +13,7 @@ void SDL_FillRect(SDL_Surface *dst, SDL_Rect *dstrect, uint32_t color) {
 }
 
 void SDL_UpdateRect(SDL_Surface *s, int x, int y, int w, int h) {
+  NDL_DrawRect((uint32_t*)s->pixels, x, y, s->w, s->h);
 }
 
 // APIs below are already implemented.
@@ -197,4 +198,24 @@ int SDL_LockSurface(SDL_Surface *s) {
 }
 
 void SDL_UnlockSurface(SDL_Surface *s) {
+}
+
+int SDL_WaitEvent(SDL_Event *ev) {
+  char buf[64], type[8], keyname[8];
+  int keycode;
+  while (1) {
+    if (NDL_PollEvent(buf, sizeof(buf)) == 0) {
+      continue;
+    }
+    sscanf(buf, "%s %s (keycode: %d)\n", type, keyname, &keycode);
+
+    if (strncmp(type, "keydown", sizeof("keydown")) == 0) {
+      ev->type = ev->key.type = SDL_KEYDOWN;
+    } else if (strncmp(type, "keydown", sizeof("keyup")) == 0) {
+      ev->type = ev->key.type = SDL_KEYUP;
+    }
+    ev->key.keysym.sym = (uint8_t)keycode;
+    return 1;
+  }
+  return 0;
 }

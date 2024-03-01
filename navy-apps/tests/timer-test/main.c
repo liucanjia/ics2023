@@ -1,4 +1,7 @@
 #include <assert.h>
+#include <stdio.h>
+#include <stdint.h>
+#include <NDL.h>
 
 int main() {
   uint32_t ms = 500;
