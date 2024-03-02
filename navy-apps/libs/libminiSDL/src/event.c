@@ -14,7 +14,32 @@ int SDL_PushEvent(SDL_Event *ev) {
 }
 
 int SDL_PollEvent(SDL_Event *ev) {
-  return 0;
+  static char buf[64] = {0};
+  char type[8], keyname[8];
+  int keycode;
+
+  if (buf[0] != 0) {
+    if (ev == NULL) {
+      return 1;
+    }
+  } else {
+    if (NDL_PollEvent(buf, sizeof(buf)) == 0) {
+      return 0;
+    } else if (ev == NULL){
+      return 1;
+    }
+  }
+
+  sscanf(buf, "%s %s (keycode: %d)\n", type, keyname, &keycode);
+  if (strncmp(type, "keydown", sizeof("keydown")) == 0) {
+    ev->type = ev->key.type = SDL_KEYDOWN;
+  } else if (strncmp(type, "keydown", sizeof("keyup")) == 0) {
+    ev->type = ev->key.type = SDL_KEYUP;
+  }
+  ev->key.keysym.sym = (uint8_t)keycode;
+  buf[0] = 0;
+
+  return 1;
 }
 
 int SDL_WaitEvent(SDL_Event *event) {
