@@ -9,6 +9,7 @@
 static int evtdev = -1;
 static int fbdev = -1;
 static int screen_w = 0, screen_h = 0;
+static int canvas_w = 0, canvas_h = 0;
 static struct timeval boot_time = {};
 
 static void get_val(char *buf, int *val) {
@@ -58,16 +59,27 @@ void NDL_OpenCanvas(int *w, int *h) {
   close(fd);
 
   sscanf(wh_buff, "WIDTH:%d\nHEIGHT:%d", &screen_w, &screen_h);
-  // The canvas size cannot exceed the screen size.
-  *w = *w > screen_w ? screen_w: *w;
-  *h = *h > screen_h ? screen_h: *h;
+  
+  if (*w == 0 || *h == 0) {
+    *w = canvas_w = screen_w;
+    *h = canvas_h = screen_h;
+  } else {
+    // The canvas size cannot exceed the screen size.
+    *w = canvas_w = *w > screen_w ? screen_w: *w;
+    *h = canvas_h = *h > screen_h ? screen_h: *h;
+  }
 }
 
 void NDL_DrawRect(uint32_t *pixels, int x, int y, int w, int h) {
+  // rect size cannot exceed the canvas size.
+  w = w > canvas_w - x ? canvas_w - x : w;
+  h = h > canvas_h - y ? canvas_h - y : h;
+
   FILE* fp = fopen("/dev/fb", "rw");
   int fd = fileno(fp);
 
-  fseek(fp, ((screen_w - w) / 2 + (screen_h - h) / 2 * screen_w), SEEK_SET);
+  //center the canvas on the screen
+  fseek(fp, ((screen_w - canvas_w) / 2 + (screen_h - canvas_h) / 2 * screen_w), SEEK_SET);
   for (int i = 0; i < h; i++) {
     write(fd, (const void*)(pixels + w * i), w * sizeof(uint32_t));
     fseek(fp, screen_w, SEEK_CUR);

@@ -7,9 +7,50 @@
 void SDL_BlitSurface(SDL_Surface *src, SDL_Rect *srcrect, SDL_Surface *dst, SDL_Rect *dstrect) {
   assert(dst && src);
   assert(dst->format->BitsPerPixel == src->format->BitsPerPixel);
+
+  int src_x, src_y, src_w, src_h, dst_x, dst_y;
+
+  if (srcrect == NULL) {
+    src_x = src_y = 0;
+    src_w = src->w;
+    src_h = src->h;
+  } else {
+    src_x = srcrect->x;
+    src_y = srcrect->y;
+    src_w = srcrect->w;
+    src_h = srcrect->h;
+  }
+
+  if (dstrect == NULL) {
+    dst_x = dst_y = 0;
+  } else {
+    dst_x = dstrect->x;
+    dst_y = dstrect->y;
+  }
+
+  uint32_t *src_ptr = (uint32_t*)src->pixels;
+  uint32_t *dst_ptr = (uint32_t*)dst->pixels;
+  for(int i = 0; i < src_h; i++) {
+    for (int j = 0; j < src_w; j++) {
+      *(dst_ptr + ((dst_x + j) + (dst_y + i) * dst->w)) = *(src_ptr + ((src_x + j) + (src_y + i) * src->w));
+    }
+  }
 }
 
 void SDL_FillRect(SDL_Surface *dst, SDL_Rect *dstrect, uint32_t color) {
+  uint32_t *ptr = (uint32_t*)(dst->pixels);
+  if (dstrect == NULL) {
+    int screen_size = dst->w * dst->h;
+    for (int i = 0; i < screen_size; i++) {
+      *(ptr + i) = color;
+    }
+  } else {
+    for (int i = 0; i < dstrect->h; i++) {
+      for (int j = 0; j < dstrect->w; j++) {
+        *(ptr + ((dstrect->x + j) + (dstrect->y + i) * dst->w)) = color;
+      }
+    }
+  }
 }
 
 void SDL_UpdateRect(SDL_Surface *s, int x, int y, int w, int h) {
@@ -198,24 +239,4 @@ int SDL_LockSurface(SDL_Surface *s) {
 }
 
 void SDL_UnlockSurface(SDL_Surface *s) {
-}
-
-int SDL_WaitEvent(SDL_Event *ev) {
-  char buf[64], type[8], keyname[8];
-  int keycode;
-  while (1) {
-    if (NDL_PollEvent(buf, sizeof(buf)) == 0) {
-      continue;
-    }
-    sscanf(buf, "%s %s (keycode: %d)\n", type, keyname, &keycode);
-
-    if (strncmp(type, "keydown", sizeof("keydown")) == 0) {
-      ev->type = ev->key.type = SDL_KEYDOWN;
-    } else if (strncmp(type, "keydown", sizeof("keyup")) == 0) {
-      ev->type = ev->key.type = SDL_KEYUP;
-    }
-    ev->key.keysym.sym = (uint8_t)keycode;
-    return 1;
-  }
-  return 0;
 }
