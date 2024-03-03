@@ -33,7 +33,7 @@ int SDL_PollEvent(SDL_Event *ev) {
   sscanf(buf, "%s %s (keycode: %d)\n", type, keyname, &keycode);
   if (strncmp(type, "keydown", sizeof("keydown")) == 0) {
     ev->type = ev->key.type = SDL_KEYDOWN;
-  } else if (strncmp(type, "keydown", sizeof("keyup")) == 0) {
+  } else if (strncmp(type, "keyup", sizeof("keyup")) == 0) {
     ev->type = ev->key.type = SDL_KEYUP;
   }
   ev->key.keysym.sym = (uint8_t)keycode;
@@ -53,7 +53,7 @@ int SDL_WaitEvent(SDL_Event *event) {
 
     if (strncmp(type, "keydown", sizeof("keydown")) == 0) {
       event->type = event->key.type = SDL_KEYDOWN;
-    } else if (strncmp(type, "keydown", sizeof("keyup")) == 0) {
+    } else if (strncmp(type, "keyup", sizeof("keyup")) == 0) {
       event->type = event->key.type = SDL_KEYUP;
     }
     event->key.keysym.sym = (uint8_t)keycode;
