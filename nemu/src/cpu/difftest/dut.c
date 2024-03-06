@@ -30,6 +30,7 @@ void (*ref_difftest_raise_intr)(uint64_t NO) = NULL;
 
 static bool is_skip_ref = false;
 static int skip_dut_nr_inst = 0;
+static bool difftest_tag = true;
 
 // this is used to let ref skip instructions which
 // can not produce consistent behavior with NEMU
@@ -100,6 +101,10 @@ static void checkregs(CPU_state *ref, vaddr_t pc) {
 }
 
 void difftest_step(vaddr_t pc, vaddr_t npc) {
+  if (difftest_tag == false) {
+    return ;
+  }
+
   CPU_state ref_r;
 
   if (skip_dut_nr_inst > 0) {
@@ -126,6 +131,14 @@ void difftest_step(vaddr_t pc, vaddr_t npc) {
   ref_difftest_regcpy(&ref_r, DIFFTEST_TO_DUT);
 
   checkregs(&ref_r, npc);
+}
+
+void difftest_detach() { difftest_tag = false; }
+
+void difftest_attach() {
+  difftest_tag = true; 
+  ref_difftest_memcpy(RESET_VECTOR, guest_to_host(RESET_VECTOR), CONFIG_MSIZE, DIFFTEST_TO_REF);
+  ref_difftest_regcpy(&cpu, DIFFTEST_TO_REF);
 }
 #else
 void init_difftest(char *ref_so_file, long img_size, int port) { }

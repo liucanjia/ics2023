@@ -15,6 +15,7 @@
 
 #include <isa.h>
 #include <cpu/cpu.h>
+#include <cpu/difftest.h>
 #include <readline/readline.h>
 #include <readline/history.h>
 #include "memory/vaddr.h"
@@ -68,6 +69,10 @@ static int cmd_w(char *args);
 
 static int cmd_d(char *args);
 
+static int cmd_detach(char *args);
+
+static int cmd_attach(char *args);
+
 static struct {
   const char *name;
   const char *description;
@@ -83,7 +88,9 @@ static struct {
   {"x", "Dispaly [N] bytes of memory, starting at address [EXPR]", cmd_x },
   {"p", "Calculate the value of [EXPR]", cmd_p },
   {"w", "Set watchpoint at the memory address of [EXPR]", cmd_w},
-  {"d", "Delete [No] watchpoint in the memory", cmd_d}
+  {"d", "Delete [No] watchpoint in the memory", cmd_d},
+  {"detach", "Disable difftest", cmd_detach},
+  {"attach", "Enable difftest", cmd_attach},
 };
 
 #define NR_CMD ARRLEN(cmd_table)
@@ -236,6 +243,18 @@ static int cmd_d(char *args) {
     }
   }
 
+  return 0;
+}
+
+static int cmd_detach(char *args) {
+  printf("Disable difftest!\n");
+  difftest_detach();
+  return 0;
+}
+
+static int cmd_attach(char *args) {
+  printf("Enable difftest!\n");
+  difftest_attach();
   return 0;
 }
 
