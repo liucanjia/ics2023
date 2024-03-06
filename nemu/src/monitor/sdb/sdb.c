@@ -18,6 +18,7 @@
 #include <cpu/difftest.h>
 #include <readline/readline.h>
 #include <readline/history.h>
+#include "memory/paddr.h"
 #include "memory/vaddr.h"
 #include "sdb.h"
 
@@ -69,9 +70,15 @@ static int cmd_w(char *args);
 
 static int cmd_d(char *args);
 
+#ifdef CONFIG_DIFFTEST
 static int cmd_detach(char *args);
 
 static int cmd_attach(char *args);
+#endif
+
+static int cmd_save(char *args);
+
+static int cmd_load(char *args);
 
 static struct {
   const char *name;
@@ -89,8 +96,12 @@ static struct {
   {"p", "Calculate the value of [EXPR]", cmd_p },
   {"w", "Set watchpoint at the memory address of [EXPR]", cmd_w},
   {"d", "Delete [No] watchpoint in the memory", cmd_d},
+#ifdef CONFIG_DIFFTEST
   {"detach", "Disable difftest", cmd_detach},
   {"attach", "Enable difftest", cmd_attach},
+#endif
+  {"save", "Save state of nemu to the file in [PATH]", cmd_save},
+  {"load", "Recover nemu's state from file in [PATH]", cmd_load}
 };
 
 #define NR_CMD ARRLEN(cmd_table)
@@ -246,6 +257,7 @@ static int cmd_d(char *args) {
   return 0;
 }
 
+#ifdef CONFIG_DIFFTEST
 static int cmd_detach(char *args) {
   printf("Disable difftest!\n");
   difftest_detach();
@@ -255,6 +267,40 @@ static int cmd_detach(char *args) {
 static int cmd_attach(char *args) {
   printf("Enable difftest!\n");
   difftest_attach();
+  return 0;
+}
+#endif
+
+static int cmd_save(char *args) {
+  FILE *fp = fopen(args, "w");
+
+  size_t n = fwrite(&cpu, sizeof(cpu), 1, fp);
+  assert(n == 1);
+
+  n = fwrite(guest_to_host(RESET_VECTOR), sizeof(uint8_t), CONFIG_MSIZE, fp);
+  assert(n == CONFIG_MSIZE);
+
+  fclose(fp);
+
+  Log("Save snapshot success!\n");
+  return 0;
+}
+
+static int cmd_load(char *args) {
+  FILE* fp = fopen(args, "r");
+
+  size_t n = fread(&cpu, sizeof(cpu), 1, fp);
+  assert(n == 1);
+
+  n = fread(guest_to_host(RESET_VECTOR), sizeof(uint8_t), CONFIG_MSIZE, fp);
+  assert(n == CONFIG_MSIZE);
+
+  fclose(fp);
+
+#ifdef CONFIG_DIFFTEST
+  difftest_attach();
+#endif
+  Log("Load snapshot success!\n");
   return 0;
 }
 
