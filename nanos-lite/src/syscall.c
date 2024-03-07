@@ -1,8 +1,13 @@
 #include <common.h>
+#include "proc.h"
 #include "syscall.h"
 #include "am.h"
 #include <fs.h>
 #include <sys/time.h>
+
+#define APP_PATH "/bin/nterm"
+
+extern void naive_uload(PCB *pcb, const char *filename);
 
 void do_syscall(Context *c) {
   uintptr_t a[4];
@@ -18,7 +23,7 @@ void do_syscall(Context *c) {
 #ifdef CONFIG_STRACE
       printf("Syscall exit, status: %d\n", a[1]);
 #endif
-      halt(a[1]);
+      naive_uload(NULL, APP_PATH);
       break;
     case SYS_yield:
 #ifdef CONFIG_STRACE
@@ -75,6 +80,12 @@ void do_syscall(Context *c) {
 #ifdef CONFIG_STRACE
       printf("Syscall brk, program break: %p, return_val: %d.\n", a[1], return_val);
 #endif
+      break;
+    case SYS_execve:
+#ifdef CONFIG_STRACE
+      printf("Syscall execve, filename: %s.\n", (char*)a[1]);
+#endif
+      naive_uload(NULL, (char*)a[1]);
       break;
     case SYS_gettimeofday:
       struct timeval* tv = (struct timeval*)a[1];

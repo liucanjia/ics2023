@@ -23,6 +23,24 @@ static void sh_prompt() {
 }
 
 static void sh_handle_cmd(const char *cmd) {
+  if (cmd == NULL) return;
+
+  char fname_buf[128];
+  if (strncmp(cmd, "echo", strlen("echo")) == 0) {
+    if (strlen(cmd) == strlen("echo") + 1) sh_printf("\n");
+    else sh_printf("%s", cmd + strlen("echo "));
+  } else {
+    if (strlen(cmd) > sizeof(fname_buf)) {
+      sh_printf("command too long\n");
+      return;
+    }
+
+    strncpy(fname_buf, cmd, strlen(cmd));
+    fname_buf[strlen(cmd) - 1] = '\0';
+    
+    setenv("PATH", "/bin", 0);
+    execvp(fname_buf, NULL);
+  }
 }
 
 void builtin_sh_run() {
